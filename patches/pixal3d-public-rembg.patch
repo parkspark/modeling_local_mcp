@@ -1,0 +1,24 @@
+diff --git a/pixal3d/pipelines/pixal3d_image_to_3d.py b/pixal3d/pipelines/pixal3d_image_to_3d.py
+index 3573311..c8d7010 100644
+--- a/pixal3d/pipelines/pixal3d_image_to_3d.py
++++ b/pixal3d/pipelines/pixal3d_image_to_3d.py
+@@ -1,4 +1,5 @@
+ from typing import *
++import os
+ import torch
+ import torch.nn as nn
+ import numpy as np
+@@ -120,7 +121,12 @@ class Pixal3DImageTo3DPipeline(Pipeline):
+         pipeline.image_cond_model_shape_1024 = None
+         pipeline.image_cond_model_tex_1024 = None
+ 
+-        pipeline.rembg_model = getattr(rembg, args['rembg_model']['name'])(**args['rembg_model']['args'])
++        # The checkpoint config currently points at a gated segmentation model.
++        # Keep local inference usable without a Hugging Face login by allowing a
++        # compatible public BiRefNet checkpoint to be selected from the environment.
++        rembg_args = dict(args['rembg_model']['args'])
++        rembg_args['model_name'] = os.environ.get('PIXAL_REMBG_MODEL', 'ZhengPeng7/BiRefNet')
++        pipeline.rembg_model = getattr(rembg, args['rembg_model']['name'])(**rembg_args)
+         
+         pipeline.low_vram = args.get('low_vram', True)
+         pipeline.default_pipeline_type = args.get('default_pipeline_type', '1024_cascade')
