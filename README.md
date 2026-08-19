@@ -1,3 +1,7 @@
+https://youtu.be/qapRggMK534
+
+
+
 # 로컬 이미지 → 편집 가능한 3D 에셋 환경
 
 이 PC의 RTX 5090(32GB)에 맞춰 **Pixal3D 1024 저메모리 모드**를 기본 생성기로 사용합니다. 입력 사진 한 장에서 PBR 텍스처가 포함된 GLB를 만들고, Blender를 통해 편집 가능한 `.blend`와 Unity/Unreal 등에서 쓸 `.fbx`도 함께 생성합니다.
