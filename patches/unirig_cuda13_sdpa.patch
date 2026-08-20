@@ -1,0 +1,113 @@
+diff --git a/configs/model/unirig_ar_350m_1024_81920_float32.yaml b/configs/model/unirig_ar_350m_1024_81920_float32.yaml
+index 3601f11..1e88fd1 100644
+--- a/configs/model/unirig_ar_350m_1024_81920_float32.yaml
++++ b/configs/model/unirig_ar_350m_1024_81920_float32.yaml
+@@ -6,7 +6,7 @@ llm:
+   hidden_size: 1024
+   word_embed_proj_dim: 1024
+   do_layer_norm_before: True
+-  _attn_implementation: flash_attention_2
++  _attn_implementation: sdpa
+ 
+ mesh_encoder:
+   __target__: michelangelo_encoder
+diff --git a/configs/model/unirig_skin.yaml b/configs/model/unirig_skin.yaml
+index 3143338..1db6a2e 100644
+--- a/configs/model/unirig_skin.yaml
++++ b/configs/model/unirig_skin.yaml
+@@ -21,6 +21,7 @@ mesh_encoder:
+   drop_path: 0.0
+   upcast_attention: False
+   upcast_softmax: False
++  enable_flash: False
+   enc_depths: [3, 3, 3, 6, 16]
+   enc_channels: [32, 64, 128, 256, 384]
+   enc_num_head: [2, 4, 8, 16, 24]
+diff --git a/src/model/sdpa_mha.py b/src/model/sdpa_mha.py
+new file mode 100644
+index 0000000..8a704b7
+--- /dev/null
++++ b/src/model/sdpa_mha.py
+@@ -0,0 +1,70 @@
++"""Checkpoint-compatible FlashAttention MHA replacement using PyTorch SDPA."""
++
++from __future__ import annotations
++
++import torch
++from torch import nn
++from torch.nn import functional as F
++
++
++class MHA(nn.Module):
++    """Minimal cross-attention layer matching flash_attn.modules.mha.MHA keys."""
++
++    def __init__(
++        self,
++        embed_dim: int,
++        num_heads: int,
++        num_heads_kv: int | None = None,
++        cross_attn: bool = False,
++        qkv_proj_bias: bool = True,
++        out_proj_bias: bool = True,
++        dropout: float = 0.0,
++        softmax_scale: float | None = None,
++        device=None,
++        dtype=None,
++        **_: object,
++    ) -> None:
++        super().__init__()
++        if not cross_attn:
++            raise NotImplementedError("The UniRig fallback only needs cross-attention")
++        if embed_dim % num_heads:
++            raise ValueError("embed_dim must be divisible by num_heads")
++
++        factory_kwargs = {"device": device, "dtype": dtype}
++        self.embed_dim = embed_dim
++        self.num_heads = num_heads
++        self.num_heads_kv = num_heads if num_heads_kv is None else num_heads_kv
++        if self.num_heads_kv != self.num_heads:
++            raise NotImplementedError("Grouped-query attention is not used by UniRig skinning")
++        self.head_dim = embed_dim // num_heads
++        self.dropout = dropout
++        self.softmax_scale = softmax_scale
++
++        # These names and shapes intentionally match flash_attn.modules.mha.MHA
++        # so the official UniRig checkpoint loads without key conversion.
++        self.Wq = nn.Linear(embed_dim, embed_dim, bias=qkv_proj_bias, **factory_kwargs)
++        self.Wkv = nn.Linear(embed_dim, embed_dim * 2, bias=qkv_proj_bias, **factory_kwargs)
++        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=out_proj_bias, **factory_kwargs)
++
++    def forward(self, x: torch.Tensor, x_kv: torch.Tensor | None = None, **_: object) -> torch.Tensor:
++        if x_kv is None:
++            x_kv = x
++        batch, query_length, _ = x.shape
++        key_length = x_kv.shape[1]
++
++        q = self.Wq(x).reshape(batch, query_length, self.num_heads, self.head_dim)
++        kv = self.Wkv(x_kv).reshape(batch, key_length, 2, self.num_heads, self.head_dim)
++        k, v = kv.unbind(dim=2)
++        q = q.transpose(1, 2)
++        k = k.transpose(1, 2)
++        v = v.transpose(1, 2)
++
++        output = F.scaled_dot_product_attention(
++            q,
++            k,
++            v,
++            dropout_p=self.dropout if self.training else 0.0,
++            scale=self.softmax_scale,
++        )
++        output = output.transpose(1, 2).reshape(batch, query_length, self.embed_dim)
++        return self.out_proj(output)
+diff --git a/src/model/unirig_skin.py b/src/model/unirig_skin.py
+index 590c461..20d304a 100644
+--- a/src/model/unirig_skin.py
++++ b/src/model/unirig_skin.py
+@@ -7,6 +7,6 @@ from transformers import AutoModelForCausalLM, AutoConfig
+ import math
+ import torch_scatter
+-from flash_attn.modules.mha import MHA
++from .sdpa_mha import MHA
+ 
+ from .spec import ModelSpec, ModelInput
+ from .parse_encoder import MAP_MESH_ENCODER, get_mesh_encoder

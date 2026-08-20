@@ -1,6 +1,7 @@
 """Render a quick validation preview of a GLB in headless Blender."""
 
 import argparse
+import math
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--pose", action="store_true")
     values = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     return parser.parse_args(values)
 
@@ -25,12 +27,40 @@ def main() -> None:
     output = Path(args.output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.object.delete(use_global=False)
-    bpy.ops.import_scene.gltf(filepath=str(Path(args.input).resolve()))
+    input_path = Path(args.input).resolve()
+    if input_path.suffix.lower() == ".blend":
+        bpy.ops.wm.open_mainfile(filepath=str(input_path))
+    else:
+        bpy.ops.object.select_all(action="SELECT")
+        bpy.ops.object.delete(use_global=False)
+        bpy.ops.import_scene.gltf(filepath=str(input_path))
+
+    if args.pose:
+        armatures = [obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"]
+        if not armatures:
+            raise RuntimeError("--pose requires an armature")
+        armature = armatures[0]
+        pose_values = {
+            "LeftUpperArm": (math.radians(25), 0.0, math.radians(-20)),
+            "RightUpperArm": (math.radians(-25), 0.0, math.radians(20)),
+            "LeftLowerArm": (math.radians(35), 0.0, 0.0),
+            "RightLowerArm": (math.radians(35), 0.0, 0.0),
+            "LeftUpperLeg": (math.radians(-15), 0.0, 0.0),
+            "RightUpperLeg": (math.radians(15), 0.0, 0.0),
+            "LeftLowerLeg": (math.radians(20), 0.0, 0.0),
+        }
+        for bone_name, rotation in pose_values.items():
+            bone = armature.pose.bones.get(bone_name)
+            if bone is None:
+                continue
+            bone.rotation_mode = "XYZ"
+            bone.rotation_euler = rotation
+        bpy.context.view_layer.update()
 
     meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
-    corners = [obj.matrix_world @ Vector(corner) for obj in meshes for corner in obj.bound_box]
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated_meshes = [obj.evaluated_get(depsgraph) for obj in meshes]
+    corners = [obj.matrix_world @ Vector(corner) for obj in evaluated_meshes for corner in obj.bound_box]
     low = Vector((min(v.x for v in corners), min(v.y for v in corners), min(v.z for v in corners)))
     high = Vector((max(v.x for v in corners), max(v.y for v in corners), max(v.z for v in corners)))
     center = (low + high) * 0.5

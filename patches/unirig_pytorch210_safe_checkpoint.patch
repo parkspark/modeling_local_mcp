@@ -1,0 +1,24 @@
+diff --git a/run.py b/run.py
+index 386c520..b92b5dc 100644
+--- a/run.py
++++ b/run.py
+@@ -3,6 +3,7 @@ import yaml
+ from box import Box
+ import os
+ import torch
++torch.serialization.add_safe_globals([Box])
+ import lightning as L
+ from lightning.pytorch.callbacks import ModelCheckpoint, Callback
+ from lightning.pytorch.loggers import WandbLogger
+@@ -259,7 +260,10 @@ if __name__ == "__main__":
+         trainer.fit(system, datamodule=data, ckpt_path=resume_from_checkpoint)
+     elif mode == 'predict':
+         assert resume_from_checkpoint is not None, 'expect resume_from_checkpoint in task'
+-        trainer.predict(system, datamodule=data, ckpt_path=resume_from_checkpoint, return_predictions=False)
++        # The official VAST-AI checkpoint contains a python-box config object,
++        # which PyTorch's weights-only unpickler cannot reconstruct.
++        trainer.predict(system, datamodule=data, ckpt_path=resume_from_checkpoint,
++                        return_predictions=False, weights_only=False)
+     elif mode == 'validate':
+         trainer.validate(system, datamodule=data, ckpt_path=resume_from_checkpoint)
+     else:

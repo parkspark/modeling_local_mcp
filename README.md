@@ -64,6 +64,18 @@ cd ..\local_modeling_mcp
 
 GLB는 PBR 텍스처를 가장 잘 보존합니다. FBX는 엔진과 재질 체계에 따라 metallic/roughness 연결을 다시 잡아야 할 수 있습니다. 게임 투입 전에는 Blender에서 폴리곤 감축, UV 확인, 실제 크기 적용, 피벗 설정, 충돌 메시와 LOD 생성을 권장합니다.
 
+## 사람형 자동 리깅 실험
+
+로컬 UniRig 환경이 설치된 PC에서는 사람형 GLB의 골격·스킨 웨이트를 생성하고 Unity Humanoid용 이름으로 후처리할 수 있습니다.
+
+```powershell
+.\scripts\rig_humanoid.ps1 `
+  -InputGlb .\artifacts\melting_knight\melting_knight.glb `
+  -Name melting_knight
+```
+
+`melting_knight` 1차 테스트는 Unity 6.5에서 유효한 Humanoid Avatar와 실제 근육 포즈 변형까지 통과했습니다. 생성 메시의 갑옷·장식 웨이트 품질은 추가 보정이 필요합니다. 자세한 결과와 환경 구성은 [`docs/humanoid-autorig-test.md`](./docs/humanoid-autorig-test.md)를 참고하세요.
+
 Pixal3D 코드와 각 체크포인트·의존성은 서로 다른 라이선스를 가질 수 있습니다. 특히 상업 배포 전에는 사용한 체크포인트의 Hugging Face 라이선스와 데이터/에셋 권리를 별도로 확인해야 합니다.
 
 정확한 버전과 커밋은 `docs\environment-lock.md`에 기록되어 있습니다.
