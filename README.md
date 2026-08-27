@@ -9,6 +9,45 @@
 
 ## 바로 사용하기
 
+### GUI로 사용하기
+
+최초 한 번 GUI 의존성을 설치합니다.
+
+```powershell
+python -m pip install -r .\requirements-gui.txt
+```
+
+그다음 로컬 GUI를 실행합니다.
+
+```powershell
+python .\app.py
+```
+
+브라우저에서 `http://127.0.0.1:7860`이 자동으로 열립니다. 이미지 선택 및 미리보기, 생성 모델 선택, 선택적 프롬프트 입력, 실시간 로그 확인, GLB/BLEND/FBX 결과 다운로드를 한 화면에서 진행할 수 있습니다. 작업별 결과는 `artifacts\gui-날짜-작업ID\`에 저장됩니다.
+
+현재 설치된 `Pixal3D 1024`는 이미지 입력만 지원하므로 GUI에 입력한 텍스트 프롬프트가 3D 생성에 직접 반영되지는 않습니다. 해당 프롬프트는 작업 폴더의 `request.json`에 기록되며, 프롬프트를 비워두면 이미지 기반 생성만 실행됩니다. 텍스트 조건을 직접 지원하는 모델을 추가할 때는 `model_registry.py`에 모델 정의를 등록하고 `generation_pipeline.py`에 해당 핸들러를 연결하면 됩니다.
+
+### 독립 Windows 데스크톱 앱
+
+브라우저 없이 네이티브 창으로 실행하려면 다음 의존성을 설치한 뒤 앱을 실행합니다.
+
+```powershell
+python -m pip install -r .\requirements-desktop.txt
+python .\desktop_app.py
+```
+
+데스크톱 앱 상단에는 PowerShell, NVIDIA GPU, WSL Ubuntu, Pixal3D 네이티브 확장, Blender 변환 브리지, 생성 스크립트의 연결 상태가 표시됩니다. 앱 시작 시 자동 점검하며 `연결 상태 새로고침` 버튼으로 다시 확인할 수 있습니다.
+
+단독 실행 가능한 Windows EXE를 빌드하려면 다음을 실행합니다.
+
+```powershell
+.\scripts\build_desktop.ps1
+```
+
+결과는 `dist\Local3DModelingStudio.exe`에 생성됩니다. EXE는 GUI와 브리지 스크립트를 포함하지만, CUDA·WSL·Pixal3D·Blender는 용량과 하드웨어 의존성 때문에 기존 로컬 설치를 사용합니다. 패키징된 앱의 생성 결과는 `%USERPROFILE%\Documents\Local3DModelingStudio\artifacts`에 저장됩니다.
+
+### PowerShell에서 사용하기
+
 PowerShell에서 다음을 실행합니다.
 
 ```powershell

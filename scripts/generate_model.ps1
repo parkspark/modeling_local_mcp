@@ -4,6 +4,7 @@ param(
     [string]$Image,
     [string]$Name,
     [int]$Seed = 42,
+    [string]$ArtifactRoot,
     [switch]$KeepOllamaLoaded
 )
 
@@ -21,7 +22,11 @@ if ($Name -notmatch '^[A-Za-z0-9._-]+$') {
     throw 'Name may contain only letters, numbers, dot, underscore, and hyphen.'
 }
 
-$artifactDirectory = Join-Path $workspace "artifacts\$Name"
+if (-not $ArtifactRoot) {
+    $ArtifactRoot = Join-Path $workspace 'artifacts'
+}
+$artifactRootPath = [IO.Path]::GetFullPath($ArtifactRoot)
+$artifactDirectory = Join-Path $artifactRootPath $Name
 New-Item -ItemType Directory -Force -Path $artifactDirectory | Out-Null
 $glbPath = Join-Path $artifactDirectory "$Name.glb"
 $logPath = Join-Path $artifactDirectory ("pixal3d-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
