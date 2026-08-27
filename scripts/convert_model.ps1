@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$InputGlb,
-    [string]$OutputBase
+    [string]$OutputBase,
+    [string]$PostprocessPlan
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,8 +30,15 @@ $bridge = Join-Path $workspace 'scripts\blender_bridge.py'
 $blendPath = "$outputBasePath.blend"
 $fbxPath = "$outputBasePath.fbx"
 
-& $blender --background --factory-startup --python $bridge -- `
-    --input $inputPath --blend $blendPath --fbx $fbxPath
+$blenderArguments = @(
+    '--background', '--factory-startup', '--python', $bridge, '--',
+    '--input', $inputPath, '--blend', $blendPath, '--fbx', $fbxPath
+)
+if ($PostprocessPlan) {
+    $planPath = (Resolve-Path -LiteralPath $PostprocessPlan).Path
+    $blenderArguments += @('--postprocess-plan', $planPath)
+}
+& $blender @blenderArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Blender conversion failed with exit code $LASTEXITCODE"
 }
@@ -38,4 +46,3 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "GLB   : $inputPath"
 Write-Host "BLEND : $blendPath"
 Write-Host "FBX   : $fbxPath"
-

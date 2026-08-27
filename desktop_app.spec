@@ -3,12 +3,21 @@
 from pathlib import Path
 
 project_root = Path(SPECPATH)
+bridge_files = (
+    "generate_model.ps1",
+    "convert_model.ps1",
+    "blender_bridge.py",
+    "generate_pixal3d.sh",
+)
 
 a = Analysis(
     [str(project_root / "desktop_app.py")],
     pathex=[str(project_root)],
     binaries=[],
-    datas=[(str(project_root / "scripts"), "scripts")],
+    datas=[
+        (str(project_root / "scripts" / filename), "scripts")
+        for filename in bridge_files
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

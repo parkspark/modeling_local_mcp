@@ -110,7 +110,7 @@ def build_app() -> gr.Blocks:
                     max_lines=10,
                 )
                 gr.Markdown(
-                    "프롬프트 지원 여부는 선택 모델에 따라 다릅니다. 지원하지 않는 모델에서는 입력 내용을 작업 기록에만 보존합니다."
+                    "Pixal3D는 텍스트를 직접 받지 않지만, 지원되는 재질·형상 명령은 생성 후 Blender 후처리로 적용합니다."
                 )
                 run_button = gr.Button(
                     "3D 모델 생성", variant="primary", size="lg"

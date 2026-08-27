@@ -5,6 +5,7 @@ param(
     [string]$Name,
     [int]$Seed = 42,
     [string]$ArtifactRoot,
+    [string]$PostprocessPlan,
     [switch]$KeepOllamaLoaded
 )
 
@@ -65,6 +66,13 @@ if ($pixalExitCode -ne 0) {
 }
 
 Write-Host '[4/5] Converting GLB to editable BLEND and Unity-compatible FBX...' -ForegroundColor Cyan
-& (Join-Path $workspace 'scripts\convert_model.ps1') -InputGlb $glbPath -OutputBase (Join-Path $artifactDirectory $Name)
+$convertArguments = @{
+    InputGlb = $glbPath
+    OutputBase = (Join-Path $artifactDirectory $Name)
+}
+if ($PostprocessPlan) {
+    $convertArguments.PostprocessPlan = (Resolve-Path -LiteralPath $PostprocessPlan).Path
+}
+& (Join-Path $workspace 'scripts\convert_model.ps1') @convertArguments
 Write-Host '[5/5] Complete.' -ForegroundColor Green
 Write-Host "      Output: $artifactDirectory"

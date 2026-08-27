@@ -293,6 +293,12 @@ class MainWindow(QMainWindow):
         if model.supports_prompt:
             self.prompt_notice.setText("● 이 모델은 프롬프트를 생성 과정에 직접 반영합니다.")
             self.prompt_notice.setStyleSheet("color:#22c55e;")
+        elif model.supports_postprocess_prompt:
+            self.prompt_notice.setText(
+                "● 색상·유광/무광·금속성·투명도·전체 크기·베벨·스무딩·폴리곤 감소를 "
+                "Blender 후처리로 적용합니다. 부위 지정은 오브젝트/재질 이름이 구분된 경우에만 적용됩니다."
+            )
+            self.prompt_notice.setStyleSheet("color:#60a5fa;")
         else:
             self.prompt_notice.setText(
                 "● 현재 모델은 프롬프트를 직접 지원하지 않습니다. 입력 내용은 작업 기록에 보존됩니다."
@@ -368,7 +374,7 @@ class MainWindow(QMainWindow):
         model_id = self.model_combo.currentData()
         model = MODELS[model_id]
         prompt = self.prompt.toPlainText().strip()
-        if prompt and not model.supports_prompt:
+        if prompt and not (model.supports_prompt or model.supports_postprocess_prompt):
             answer = QMessageBox.question(
                 self,
                 "프롬프트 미지원",

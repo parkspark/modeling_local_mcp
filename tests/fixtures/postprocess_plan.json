@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "source_prompt": "렌즈를 파란색 유광으로 하고 투명도 20%, 모서리를 둥글게",
+  "operations": [
+    {
+      "type": "material",
+      "target": "lens",
+      "base_color": [0.03, 0.15, 0.8, 1.0],
+      "roughness": 0.15,
+      "alpha": 0.8
+    },
+    {
+      "type": "bevel",
+      "target": "all",
+      "width_ratio": 0.01,
+      "segments": 3
+    }
+  ],
+  "warnings": []
+}

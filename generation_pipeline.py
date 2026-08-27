@@ -16,6 +16,7 @@ from typing import Iterator
 from uuid import uuid4
 
 from model_registry import MODELS
+from prompt_postprocess import parse_prompt
 
 
 SOURCE_ROOT = Path(__file__).resolve().parent
@@ -82,14 +83,21 @@ def create_job(
         source_image_name=source.name,
         created_at=datetime.now().astimezone().isoformat(timespec="seconds"),
     )
+    postprocess_plan = parse_prompt(request.prompt)
     metadata = {
         **asdict(request),
         "prompt_applied_directly": bool(
             request.prompt and MODELS[model_id].supports_prompt
         ),
+        "prompt_postprocess_supported": MODELS[model_id].supports_postprocess_prompt,
+        "postprocess_operation_count": len(postprocess_plan.operations),
     }
     (artifact_directory / "request.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (artifact_directory / "postprocess_plan.json").write_text(
+        json.dumps(postprocess_plan.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
     return request, copied_image, artifact_directory
 
@@ -102,8 +110,10 @@ def find_powershell() -> str:
     raise RuntimeError("PowerShell 실행 파일을 찾을 수 없습니다.")
 
 
-def build_command(image_path: Path, job_id: str) -> list[str]:
-    return [
+def build_command(
+    image_path: Path, job_id: str, postprocess_plan: Path | None = None
+) -> list[str]:
+    command = [
         find_powershell(),
         "-NoLogo",
         "-NoProfile",
@@ -119,6 +129,9 @@ def build_command(image_path: Path, job_id: str) -> list[str]:
         "-ArtifactRoot",
         str(ARTIFACTS_DIRECTORY),
     ]
+    if postprocess_plan is not None:
+        command.extend(["-PostprocessPlan", str(postprocess_plan)])
+    return command
 
 
 def _read_stream(stream, label: str, output_queue: Queue[tuple[str, str | None]]) -> None:
@@ -144,11 +157,18 @@ def stream_generation(
         f"[GUI] 모델: {model.display_name}",
         f"[GUI] 입력 이미지: {copied_image}",
     ]
-    if request.prompt and not model.supports_prompt:
+    plan_path = artifact_directory / "postprocess_plan.json"
+    plan = parse_prompt(request.prompt)
+    if request.prompt and model.supports_postprocess_prompt:
         initial_lines.append(
-            "[안내] 입력한 프롬프트는 작업 기록에 저장되지만, 현재 Pixal3D 생성에는 "
-            "직접 적용되지 않습니다."
+            f"[GUI] Blender 후처리 명령 {len(plan.operations)}개를 생성했습니다."
         )
+        for operation in plan.operations:
+            initial_lines.append(f"[POSTPROCESS][PLAN] {json.dumps(operation, ensure_ascii=False)}")
+        for warning in plan.warnings:
+            initial_lines.append(f"[POSTPROCESS][WARN] {warning}")
+    elif request.prompt and not model.supports_prompt:
+        initial_lines.append("[안내] 이 모델에서는 입력한 프롬프트가 적용되지 않습니다.")
     elif request.prompt:
         initial_lines.append("[GUI] 프롬프트를 모델에 전달합니다.")
     else:
@@ -161,7 +181,7 @@ def stream_generation(
     if model.handler != "powershell_pixal3d":
         raise RuntimeError(f"구현되지 않은 모델 핸들러입니다: {model.handler}")
 
-    command = build_command(copied_image, request.job_id)
+    command = build_command(copied_image, request.job_id, plan_path)
     process = subprocess.Popen(
         command,
         cwd=DATA_ROOT,
@@ -231,7 +251,11 @@ def stream_generation(
         )
         return
 
-    result_files = expected_files + [artifact_directory / "request.json", gui_log_path]
+    result_files = expected_files + [
+        artifact_directory / "request.json",
+        plan_path,
+        gui_log_path,
+    ]
     pixal_logs = sorted(artifact_directory.glob("pixal3d-*.log"))
     result_files.extend(pixal_logs)
     accumulated += f"[완료] 결과 저장 위치: {artifact_directory}\n"
